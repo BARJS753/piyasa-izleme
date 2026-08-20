@@ -26,8 +26,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-# os.environ["FRED_API_KEY"] = "bf16c2cec418fb4b295c092f40439f9a"
-
 try:
     import yfinance as yf
 except ImportError:
