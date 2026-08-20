@@ -35,7 +35,7 @@ if not st.session_state.sifre_dogrulandi:
     st.markdown("<p style='text-align:center;'>Devam etmek için şifrenizi girin.</p>", unsafe_allow_html=True)
     sifre_input = st.text_input("Şifre", type="password", placeholder="••••••")
     if st.button("Giriş Yap"):
-        if sifre_input == "16061606":
+        if sifre_input == "baris123":
             st.session_state.sifre_dogrulandi = True
             st.rerun()
         else:
@@ -300,12 +300,14 @@ else:
 
             delta = close.diff()
 
+            # RSI 14
             gain14 = (delta.where(delta > 0, 0)).rolling(14).mean()
             loss14 = (-delta.where(delta < 0, 0)).rolling(14).mean()
             loss14 = loss14.replace(0, np.nan)
             rs14 = gain14 / loss14
             rsi14 = 100 - (100 / (1 + rs14))
 
+            # RSI 10
             gain10 = (delta.where(delta > 0, 0)).rolling(10).mean()
             loss10 = (-delta.where(delta < 0, 0)).rolling(10).mean()
             loss10 = loss10.replace(0, np.nan)
@@ -335,6 +337,7 @@ else:
             dist_high_52 = ((close / high_52) - 1) * 100
             dist_low_52 = ((close / low_52) - 1) * 100
 
+            # Yeni göstergeler
             obv = (np.sign(delta) * volume).cumsum()
             obv_trend = obv.pct_change(20) * 100
 
@@ -348,7 +351,10 @@ else:
             son = hist.iloc[-1]
 
             ozellikler = pd.DataFrame([[
-                daily_ret.iloc[-1], rsi14.iloc[-1], rsi10.iloc[-1], momentum5.iloc[-1],
+                daily_ret.iloc[-1],
+                rsi14.iloc[-1],
+                rsi10.iloc[-1],
+                momentum5.iloc[-1],
                 (macd_hist.iloc[-1] / son['Close']) * 100,
                 ((son['Close'] / sma50.iloc[-1]) - 1) * 100,
                 ((son['Close'] / sma200.iloc[-1]) - 1) * 100,
@@ -356,9 +362,12 @@ else:
                 volume_trend.iloc[-1],
                 ((son['Close'] / bb_upper.iloc[-1]) - 1) * 100,
                 ((son['Close'] / bb_lower.iloc[-1]) - 1) * 100,
-                dist_high_52.iloc[-1], dist_low_52.iloc[-1],
-                obv_trend.iloc[-1], stoch_k.iloc[-1],
-                cci.iloc[-1], williams_r.iloc[-1]
+                dist_high_52.iloc[-1],
+                dist_low_52.iloc[-1],
+                obv_trend.iloc[-1],
+                stoch_k.iloc[-1],
+                cci.iloc[-1],
+                williams_r.iloc[-1]
             ]], columns=feature_names)
 
             if ozellikler.isnull().any().any():
@@ -368,7 +377,7 @@ else:
             yon = "🟢 Yükselebilir" if proba[1] > proba[0] else "🔴 Düşebilir"
             olasilik = proba[1] * 100
             return yon, olasilik
-        except Exception:
+        except Exception as e:
             return None, 0.0
 
     for d in results:
@@ -381,6 +390,7 @@ else:
             d.ai_yon = "⚪ Model Yok"
             d.ai_olasilik = 0.0
 
+        # --- HİBRİT TAHMİN (Yapay Zeka + Haber Duygu) ---
         if d.ai_olasilik is not None and d.news_score is not None:
             hibrit_skor = d.ai_olasilik * 0.75 + d.news_score * 0.25
             if hibrit_skor >= 58:
@@ -394,6 +404,7 @@ else:
             d.hibrit_yon = "⚪ Veri Eksik"
             d.hibrit_olasilik = 0.0
 
+    # --- VERİTABANINA KAYDET ---
     def veritabani_kaydet(results):
         conn = sqlite3.connect('piyasa_gecmis.db')
         c = conn.cursor()
@@ -419,6 +430,7 @@ else:
         conn.close()
     veritabani_kaydet(results)
 
+    # ==================== PİYASA ÖZETİ ====================
     st.markdown("---")
     st.subheader("📋 Piyasa Özeti")
     if results:
@@ -439,6 +451,7 @@ else:
     if dusuk_skorlular:
         st.error("⚠️ **Düşük skorlu varlıklar:** " + ", ".join([f"{d.symbol} ({d.score})" for d in dusuk_skorlular]))
 
+    # ==================== TÜM VARLIKLAR TABLOSU ====================
     st.markdown("---")
     st.subheader("📊 Tüm Varlıklar Tablosu")
     df = pd.DataFrame([{
@@ -484,11 +497,13 @@ else:
                         .format({'Fiyat': '{:.2f}', 'Değişim%': '{:+.2f}%', 'ATR': '{:.2f}', 'Haber Skoru': '{:.1f}', 'Güven': '{:.0%}', 'AI Olasılık': '{:.0f}%', 'Hibrit Skor': '{:.0f}%'})
     st.dataframe(styled_df, width='stretch')
 
+    # ==================== AL/SAT SİNYALLERİ TABLOSU ====================
     st.markdown("---")
     st.subheader("🟢🔴 Al/Sat Sinyalleri")
 
     def sinyal_uret(data):
         sinyaller = {}
+        # RSI Sinyali
         if data.rsi is not None:
             if data.rsi < 30:
                 sinyaller['RSI'] = "AL"
@@ -498,6 +513,7 @@ else:
                 sinyaller['RSI'] = "BEKLE"
         else:
             sinyaller['RSI'] = "—"
+        # MACD Sinyali
         if data.macd is not None and data.macd_signal is not None:
             if data.macd > data.macd_signal:
                 sinyaller['MACD'] = "AL"
@@ -505,6 +521,7 @@ else:
                 sinyaller['MACD'] = "SAT"
         else:
             sinyaller['MACD'] = "—"
+        # Bollinger Sinyali
         if data.bb_upper and data.bb_lower and data.price:
             bb_range = data.bb_upper - data.bb_lower
             if bb_range > 0:
@@ -519,6 +536,7 @@ else:
                 sinyaller['Bollinger'] = "—"
         else:
             sinyaller['Bollinger'] = "—"
+        # Momentum Sinyali
         if data.change_pct is not None:
             if data.change_pct > 2:
                 sinyaller['Momentum'] = "AL"
@@ -529,6 +547,7 @@ else:
         else:
             sinyaller['Momentum'] = "—"
 
+        # Genel sinyal: oy çokluğu
         al = sum(1 for s in sinyaller.values() if s == "AL")
         sat = sum(1 for s in sinyaller.values() if s == "SAT")
         if al > sat and al >= 2:
@@ -553,6 +572,7 @@ else:
     sinyal_df = pd.DataFrame(sinyal_data)
     st.dataframe(sinyal_df, width='stretch')
 
+    # ==================== DETAYLI VARLIK ANALİZİ ====================
     st.markdown("---")
     st.subheader("🔍 Detaylı Varlık Analizi")
     secili_sembol = st.selectbox(
@@ -577,6 +597,7 @@ else:
             st.caption(f"🧠 Hibrit tahmine göre yükselme olasılığı: **%{secili_data.hibrit_olasilik:.1f}**")
             st.caption(f"📰 Haber skoru: **{secili_data.news_score:.1f}** | AI olasılık: **%{secili_data.ai_olasilik:.1f}**")
 
+        # Grafik
         hist = all_histories.get(secili_sembol)
         if hist is not None and not hist.empty:
             fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.5, 0.2, 0.15, 0.15])
@@ -608,6 +629,7 @@ else:
         else:
             st.info("Geçmiş veri bulunamadı.")
 
+        # Temel Bilgiler
         st.markdown("#### 📋 Temel Bilgiler")
         colA, colB, colC = st.columns(3)
         colA.write(f"**Sektör:** {secili_data.sector or 'Bilinmiyor'}")
@@ -617,6 +639,7 @@ else:
         colB.write(f"**52H Yüksek:** {secili_data.high_52:.2f}" if secili_data.high_52 else "**52H Yüksek:** —")
         colC.write(f"**52H Uzaklık:** {secili_data.dist_high or 0:+.2f}%" if secili_data.dist_high else "**52H Uzaklık:** —")
 
+        # Gösterge Açıklamaları
         with st.expander("📖 Gösterge Açıklamaları"):
             st.markdown("""
             - **Fiyat Mum Grafiği:** Dönem içindeki açılış, yüksek, düşük ve kapanışı gösterir.
@@ -626,6 +649,7 @@ else:
             - **MACD:** Hareketli ortalamalar arasındaki farktır. Sinyal çizgisini yukarı keserse al, aşağı keserse sat sinyali sayılır.
             """)
 
+        # Haberler
         st.markdown("#### 📰 Son Haberler ve Duygu Analizi")
         if secili_data.news:
             for n in secili_data.news[:5]:
@@ -637,6 +661,7 @@ else:
         else:
             st.info("Bu varlık için haber bulunamadı.")
 
+    # ==================== GELİŞMİŞ GRAFİKLER ====================
     st.markdown("---")
     st.subheader("📈 Gelişmiş Grafikler")
 
@@ -686,6 +711,7 @@ else:
         fig_vol.update_layout(height=400, title=f'{secili_vol} Volatilite (ATR)')
         st.plotly_chart(fig_vol, width='stretch')
 
+    # ==================== GEÇMİŞ SKOR TAKİBİ ====================
     st.markdown("---")
     st.subheader("📅 Geçmiş Skor Takibi")
     conn = sqlite3.connect('piyasa_gecmis.db')
@@ -717,20 +743,6 @@ st.markdown("---")
 st.caption("⚠️ Bu araç yalnızca bilgilendirme amaçlıdır, yatırım tavsiyesi değildir. Tahminler istatistikseldir ve kesin sonuç vermez.")
 st.caption(f"Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-# İmza (sağ alt köşeye sabit)
-st.markdown("""
-<style>
-.footer {
-    position: fixed;
-    right: 15px;
-    bottom: 10px;
-    z-index: 999;
-    font-size: 13px;
-    color: #888;
-    background: rgba(0,0,0,0.3);
-    padding: 5px 10px;
-    border-radius: 8px;
-}
-</style>
-<div class="footer">Made by Barış</div>
-""", unsafe_allow_html=True)
+# İmza (sayfanın en altında, sol hizalı)
+st.markdown("---")
+st.caption("Made by Barış")
