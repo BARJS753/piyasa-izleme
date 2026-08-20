@@ -35,7 +35,12 @@ if not st.session_state.sifre_dogrulandi:
     st.markdown("<p style='text-align:center;'>Devam etmek için şifrenizi girin.</p>", unsafe_allow_html=True)
     sifre_input = st.text_input("Şifre", type="password", placeholder="••••••")
     if st.button("Giriş Yap"):
-        if sifre_input == "baris123":
+        try:
+            dogru_sifre = st.secrets["APP_PASSWORD"]
+        except Exception:
+            dogru_sifre = None
+
+        if dogru_sifre and sifre_input == dogru_sifre:
             st.session_state.sifre_dogrulandi = True
             st.rerun()
         else:
@@ -377,7 +382,7 @@ else:
             yon = "🟢 Yükselebilir" if proba[1] > proba[0] else "🔴 Düşebilir"
             olasilik = proba[1] * 100
             return yon, olasilik
-        except Exception as e:
+        except Exception:
             return None, 0.0
 
     for d in results:
@@ -503,7 +508,6 @@ else:
 
     def sinyal_uret(data):
         sinyaller = {}
-        # RSI Sinyali
         if data.rsi is not None:
             if data.rsi < 30:
                 sinyaller['RSI'] = "AL"
@@ -513,7 +517,6 @@ else:
                 sinyaller['RSI'] = "BEKLE"
         else:
             sinyaller['RSI'] = "—"
-        # MACD Sinyali
         if data.macd is not None and data.macd_signal is not None:
             if data.macd > data.macd_signal:
                 sinyaller['MACD'] = "AL"
@@ -521,7 +524,6 @@ else:
                 sinyaller['MACD'] = "SAT"
         else:
             sinyaller['MACD'] = "—"
-        # Bollinger Sinyali
         if data.bb_upper and data.bb_lower and data.price:
             bb_range = data.bb_upper - data.bb_lower
             if bb_range > 0:
@@ -536,7 +538,6 @@ else:
                 sinyaller['Bollinger'] = "—"
         else:
             sinyaller['Bollinger'] = "—"
-        # Momentum Sinyali
         if data.change_pct is not None:
             if data.change_pct > 2:
                 sinyaller['Momentum'] = "AL"
@@ -547,7 +548,6 @@ else:
         else:
             sinyaller['Momentum'] = "—"
 
-        # Genel sinyal: oy çokluğu
         al = sum(1 for s in sinyaller.values() if s == "AL")
         sat = sum(1 for s in sinyaller.values() if s == "SAT")
         if al > sat and al >= 2:
@@ -597,7 +597,6 @@ else:
             st.caption(f"🧠 Hibrit tahmine göre yükselme olasılığı: **%{secili_data.hibrit_olasilik:.1f}**")
             st.caption(f"📰 Haber skoru: **{secili_data.news_score:.1f}** | AI olasılık: **%{secili_data.ai_olasilik:.1f}**")
 
-        # Grafik
         hist = all_histories.get(secili_sembol)
         if hist is not None and not hist.empty:
             fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.5, 0.2, 0.15, 0.15])
@@ -629,7 +628,6 @@ else:
         else:
             st.info("Geçmiş veri bulunamadı.")
 
-        # Temel Bilgiler
         st.markdown("#### 📋 Temel Bilgiler")
         colA, colB, colC = st.columns(3)
         colA.write(f"**Sektör:** {secili_data.sector or 'Bilinmiyor'}")
@@ -639,7 +637,6 @@ else:
         colB.write(f"**52H Yüksek:** {secili_data.high_52:.2f}" if secili_data.high_52 else "**52H Yüksek:** —")
         colC.write(f"**52H Uzaklık:** {secili_data.dist_high or 0:+.2f}%" if secili_data.dist_high else "**52H Uzaklık:** —")
 
-        # Gösterge Açıklamaları
         with st.expander("📖 Gösterge Açıklamaları"):
             st.markdown("""
             - **Fiyat Mum Grafiği:** Dönem içindeki açılış, yüksek, düşük ve kapanışı gösterir.
@@ -649,7 +646,6 @@ else:
             - **MACD:** Hareketli ortalamalar arasındaki farktır. Sinyal çizgisini yukarı keserse al, aşağı keserse sat sinyali sayılır.
             """)
 
-        # Haberler
         st.markdown("#### 📰 Son Haberler ve Duygu Analizi")
         if secili_data.news:
             for n in secili_data.news[:5]:
@@ -661,7 +657,6 @@ else:
         else:
             st.info("Bu varlık için haber bulunamadı.")
 
-    # ==================== GELİŞMİŞ GRAFİKLER ====================
     st.markdown("---")
     st.subheader("📈 Gelişmiş Grafikler")
 
@@ -711,7 +706,6 @@ else:
         fig_vol.update_layout(height=400, title=f'{secili_vol} Volatilite (ATR)')
         st.plotly_chart(fig_vol, width='stretch')
 
-    # ==================== GEÇMİŞ SKOR TAKİBİ ====================
     st.markdown("---")
     st.subheader("📅 Geçmiş Skor Takibi")
     conn = sqlite3.connect('piyasa_gecmis.db')
@@ -743,6 +737,5 @@ st.markdown("---")
 st.caption("⚠️ Bu araç yalnızca bilgilendirme amaçlıdır, yatırım tavsiyesi değildir. Tahminler istatistikseldir ve kesin sonuç vermez.")
 st.caption(f"Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-# İmza (sayfanın en altında, sol hizalı)
 st.markdown("---")
 st.caption("Made by Barış")
